@@ -27,6 +27,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var import_commander = require("commander");
 var import_path = require("path");
 var import_degit = __toESM(require("degit"));
+var import_fs = __toESM(require("fs"));
 var program = new import_commander.Command();
 program.name("dual-serve").description("Dual Serve is a CLI tool for create serverless project").version("1.0.0");
 program.command("new <project-name>").description("Create project").action(async (projectName) => {
@@ -36,16 +37,76 @@ program.command("new <project-name>").description("Create project").action(async
   const emitter = (0, import_degit.default)(repo, { cache: false, force: true });
   try {
     await emitter.clone(targetDir);
+    const packageJsonPath = (0, import_path.join)(targetDir, "package.json");
+    if (import_fs.default.existsSync(packageJsonPath)) {
+      const pkg = JSON.parse(import_fs.default.readFileSync(packageJsonPath, "utf-8"));
+      pkg.name = projectName;
+      import_fs.default.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
+    }
+    const appConfigPath = (0, import_path.join)(targetDir, "bin", "app-config.ts");
+    if (import_fs.default.existsSync(appConfigPath)) {
+      let content = import_fs.default.readFileSync(appConfigPath, "utf-8");
+      content = content.replace(
+        /appName:\s*["'`][^"'`]+["'`]/,
+        `appName: "${projectName}"`
+      );
+      content = content.replace(
+        /name:\s*["'`]my-serverless-app-\$\{self\.stage\}["'`]/,
+        `name: "${projectName}-\${self.stage}"`
+      );
+      content = content.replace(
+        /name:\s*["'`]my-websocket-api-\$\{self\.stage\}["'`]/,
+        `name: "${projectName}-\${self.stage}"`
+      );
+      import_fs.default.writeFileSync(appConfigPath, content);
+    }
+    const lambdaCdkPath = (0, import_path.join)(targetDir, "bin", "lambda-cdk.ts");
+    if (import_fs.default.existsSync(lambdaCdkPath)) {
+      let content = import_fs.default.readFileSync(lambdaCdkPath, "utf-8");
+      content = content.replace(
+        /new CdkStack\(\s*app,\s*`[^`]+-\$\{stageName\}`/,
+        `new CdkStack(app, \`${projectName}-\${stageName}\``
+      );
+      content = content.replace(
+        /stackName:\s*`[^`]+-\$\{stageName\}`/,
+        `stackName: \`${projectName}-\${stageName}\``
+      );
+      import_fs.default.writeFileSync(lambdaCdkPath, content);
+    }
+    const apisDir = (0, import_path.join)(targetDir, "src", "apis", "examples");
+    updateApiGatewayNameInConfigFiles(apisDir, projectName);
     console.log("Project created!");
-    console.log(`
+    console.log(
+      `
 Next steps:
   cd ${projectName}
   npm install
-  npm run dev`);
+  npm run start`
+    );
+    return;
   } catch (err) {
     console.error("Error cloning template:", err);
     process.exit(1);
   }
 });
 program.parse(process.argv);
+function updateApiGatewayNameInConfigFiles(dir, projectName) {
+  if (!import_fs.default.existsSync(dir)) return;
+  const files = import_fs.default.readdirSync(dir, { withFileTypes: true });
+  for (const file of files) {
+    const fullPath = (0, import_path.join)(dir, file.name);
+    if (file.isDirectory()) {
+      updateApiGatewayNameInConfigFiles(fullPath, projectName);
+    }
+    if (file.isFile() && file.name.endsWith("config.ts")) {
+      let content = import_fs.default.readFileSync(fullPath, "utf-8");
+      if (!content.includes("apiGatewayName")) continue;
+      content = content.replace(
+        /apiGatewayName:\s*["'`][^"'`]+-\$\{self\.stage\}["'`]/g,
+        `apiGatewayName: "${projectName}-\${self.stage}"`
+      );
+      import_fs.default.writeFileSync(fullPath, content);
+    }
+  }
+}
 //# sourceMappingURL=cli.js.map

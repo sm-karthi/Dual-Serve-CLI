@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "clean": "rm -rf dist",
-    "build": "npm run clean && tsup",
-    "postbuild": "chmod +x dist/cli.js"
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsup"
   },
   "bin": {
     "dual-serve": "./dist/cli.js"
@@ -21,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
+    "rimraf": "^6.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
